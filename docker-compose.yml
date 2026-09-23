@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # INFRASTRUCTURE SERVICES
+  # =========================================================================
+
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: insurance-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: insurance_quote_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d insurance_quote_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: insurance-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Apache Kafka (KRaft Mode)
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: insurance-kafka
+    restart: always
+    ports:
+      - "9092:9092"   # Internal Docker network
+      - "9094:9094"   # Host machine access
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9094,CONTROLLER://0.0.0.0:29093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://127.0.0.1:9094'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  # 4. Kafbat UI
+  kafbat-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: insurance-kafbat-ui
+    restart: always
+    ports:
+      - "8085:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  # =========================================================================
+  # APPLICATION SERVICES
+  # =========================================================================
+
+  # 5. Spring Boot Backend Application
+  backend:
+    build:
+      context: . # Current backend repository root
+      dockerfile: Dockerfile
+    container_name: insurance-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/insurance_quote_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgrespassword
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # 6. React / Vite Frontend Application
+  frontend:
+    build:
+      context: ../insurance-quote-ui # Relative path to sibling frontend repository
+      dockerfile: Dockerfile
+    container_name: insurance-frontend
+    restart: always
+    ports:
+      - "3000:80" # Access UI at http://localhost:3000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
