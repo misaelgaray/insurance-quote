@@ -31,6 +31,9 @@ Run by using `docker compose up -d --build`
 
 * **Kafka Management UI (Kafbat): http://localhost:8085**
 
+4. Swagger docs:
+* **http://localhost:8080/swagger-ui/index.html**
+
 ## 🚀 Setup & Execution Instructions
 
 ### Prerequisites
@@ -70,3 +73,39 @@ Rather than building a single monolithic schema, the data layer was split into 3
 2. quoting: Active quote drafts, applicant information, selected plans, and status transitions.
 
 3. underwriting: Supplemental health questionnaire assessments for risk scoring.
+
+## Backend Design
+Backend is implemented as a decoupled monolith ready to be migrated to a distributed architecture, as it has a domain driven architecture.
+You will find the following domains. Database is also splitted accordingly in 3 schemas (catalogs, quoting and underwriting):
+* auth: Handles JWT authentication.
+* catalog: Contains all catalogs information like coverages, preexisting conditions, etc.
+* quoting: Contains quoting business logic like jobs, premium calculations, quote state management, CRUD operations.
+* underwriting: Handles supplemental health storage and retrieval.
+* common: Handles common spring boot configurations. It contains global exception handling, Redis cache config and Generic Error Response.
+
+#### Authentication
+JWT Authentication was implemented in order to secure all the APIs.
+The `/api/v1/auth/token` generates a token that will be used to authenticate the further request to the APIs.
+This endpoint requires no credentials user/password.
+
+#### Quoting
+This is the domains that handles the main business logic. It has a `client`
+folder that contains the interfaces communicates with other domains like `catalog`.
+Its implementation directly uses the `catalog.services` interfaces to gather the required information, which 
+in future rearchitecture could be replaced by feign requests.  
+The `job` folder, contains the `DraftExpirationJob` that handles expired quotes. The scheduler is 
+configurable by using the `app.quoting.draft-expiration.cron` property.
+`QuoteServiceImpl` handles the logic to submit, update status and create quotes.
+`DefaultPremiumCalculationEngine` handles the prime calculation. 
+
+## AI tools
+AI generative tools were using to create Unit Testing, write boilerplate code,
+generate DTOs, SQL migration files, CSS styles, Components, Services to communicate with backend.  
+AI was provided with the architecture design, rules and all the context in order to 
+understand the goal of the project. 
+
+### Challenges 
+
+Something that was pending to implement, was the communication with
+downstream APIs (httpstat.us). I wanted to implement a mechanism to 
+handle different http status. 
