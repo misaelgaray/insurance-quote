@@ -104,8 +104,3 @@ generate DTOs, SQL migration files, CSS styles, Components, Services to communic
 AI was provided with the architecture design, rules and all the context in order to 
 understand the goal of the project. 
 
-### Challenges 
-
-Something that was pending to implement, was the communication with
-downstream APIs (httpstat.us). I wanted to implement a mechanism to 
-handle different http status. 
