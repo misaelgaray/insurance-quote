@@ -22,6 +22,11 @@ Run by using `docker compose up -d --build`
 2. From the root directory of this backend repository, launch the full stack:
    ```text
    docker compose up -d --build
+   ```
+   * **And use the following to down the whole fullstack**
+   ```text
+     docker compose down -v
+     ```
 
 3. Verify container statuses:
 
@@ -33,6 +38,12 @@ Run by using `docker compose up -d --build`
 
 4. Swagger docs:
 * **http://localhost:8080/swagger-ui/index.html**
+
+5. Prometheus JVM Dashboard:
+* **http://localhost:3001/** use `admin` as user/password
+
+6. Kafbat UI to visualize topics and messages:
+* **http://localhost:8085/**
 
 ## 🚀 Setup & Execution Instructions
 
